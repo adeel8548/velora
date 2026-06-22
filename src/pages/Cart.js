@@ -142,6 +142,7 @@ export default function Cart() {
                           originalPrice={item.originalPrice}
                           discountPercent={item.discountPercent}
                           size="md"
+                          variant="card"
                           className="mb-4"
                         />
                       ) : (

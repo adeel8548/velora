@@ -78,6 +78,7 @@ function ProductCard({ product, onAddToCart, addedId }) {
             originalPrice={product.originalPrice}
             discountPercent={product.discountPercent}
             size="md"
+            variant="card"
             className="mb-4"
           />
         ) : (

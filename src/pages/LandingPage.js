@@ -246,6 +246,7 @@ export default function LandingPage() {
                       originalPrice={product.originalPrice}
                       discountPercent={product.discountPercent}
                       size="sm"
+                      variant="card"
                       className="mt-2"
                     />
                   ) : (

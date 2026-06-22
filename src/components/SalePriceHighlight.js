@@ -3,40 +3,33 @@ import { formatPKR } from "../lib/format";
 
 const SIZES = {
   sm: {
-    box: "p-2 rounded-lg",
-    sale: "text-[9px] px-1.5 py-0.5",
-    off: "text-[9px] px-1.5 py-0.5",
     price: "text-sm",
     was: "text-[10px]",
-    save: "text-[9px]",
-  },
-  md: {
-    box: "p-3 rounded-xl",
-    sale: "text-[10px] px-2 py-0.5",
-    off: "text-[10px] px-2 py-0.5",
-    price: "text-lg",
-    was: "text-xs",
     save: "text-[10px]",
   },
+  md: {
+    price: "text-lg",
+    was: "text-xs",
+    save: "text-xs",
+  },
   lg: {
-    box: "p-4 rounded-2xl",
-    sale: "text-xs px-3 py-1",
-    off: "text-xs px-3 py-1",
     price: "text-3xl sm:text-4xl",
     was: "text-base",
-    save: "text-xs",
+    save: "text-sm",
   },
 };
 
 /**
- * Brand-style sale block: SALE badge + discount % + sale price + was price + savings.
+ * Sale pricing display.
+ * variant="card" — simple price + strikethrough + "You save" (no box/badges)
+ * variant="full" — highlighted box (cart/checkout)
  */
 export default function SalePriceHighlight({
   salePrice,
   originalPrice,
   discountPercent = 0,
   size = "md",
-  layout = "block",
+  variant = "card",
   className = "",
 }) {
   const sale = Number(salePrice ?? 0);
@@ -54,42 +47,26 @@ export default function SalePriceHighlight({
     );
   }
 
-  const badges = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span
-        className={`inline-flex items-center gap-1 rounded-md bg-red-600 font-black uppercase tracking-wider text-white shadow-sm ${s.sale}`}
-      >
-        <span aria-hidden>🏷️</span> Sale
-      </span>
-      <span
-        className={`inline-flex rounded-md bg-amber-500 font-black uppercase tracking-wide text-white shadow-sm ${s.off}`}
-      >
-        {discount}% Off
-      </span>
-    </div>
-  );
-
   const prices = (
-    <div className={`flex flex-wrap items-baseline gap-2 ${layout === "inline" ? "mt-0" : "mt-2"}`}>
-      <span className={`font-black text-emerald-700 ${s.price}`}>
+    <div className="flex flex-wrap items-baseline gap-2">
+      <span className={`font-bold text-emerald-700 ${s.price}`}>
         {formatPKR(sale)}
       </span>
-      <span className={`text-slate-400 line-through font-medium ${s.was}`}>
+      <span className={`text-slate-400 line-through ${s.was}`}>
         {formatPKR(original)}
       </span>
     </div>
   );
 
   const savings = (
-    <p className={`mt-1 font-bold text-amber-700 ${s.save}`}>
+    <p className={`font-semibold text-amber-700 ${s.save}`}>
       You save {formatPKR(saved)}
     </p>
   );
 
-  if (layout === "inline") {
+  if (variant === "card") {
     return (
-      <div className={`inline-flex flex-col ${className}`}>
-        {badges}
+      <div className={className}>
         {prices}
         {savings}
       </div>
@@ -98,9 +75,8 @@ export default function SalePriceHighlight({
 
   return (
     <div
-      className={`border-2 border-amber-400/80 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 shadow-sm ring-1 ring-amber-200/60 ${s.box} ${className}`}
+      className={`rounded-xl border border-amber-200 bg-amber-50/80 p-3 ${className}`}
     >
-      {badges}
       {prices}
       {savings}
     </div>

@@ -43,6 +43,7 @@ export default function ProductCard({ product, onAdd }) {
               originalPrice={product.originalPrice}
               discountPercent={product.discountPercent}
               size="sm"
+              variant="card"
             />
           ) : (
             <div className={`text-xl font-bold text-slate-900`}>

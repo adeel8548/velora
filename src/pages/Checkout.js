@@ -380,7 +380,7 @@ export default function Checkout() {
                             originalPrice={item.originalPrice}
                             discountPercent={item.discountPercent}
                             size="sm"
-                            layout="inline"
+                            variant="card"
                             className="mt-2"
                           />
                         )}

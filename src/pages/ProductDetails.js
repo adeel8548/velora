@@ -9,7 +9,7 @@ import {
 import { getDemoProductById, getRelatedDemoProducts } from "../data/demoProducts";
 import ProductImage from "../components/ProductImage";
 import Swal from "sweetalert2";
-import { productHasDiscount, buildCartItem } from "../lib/mappers";
+import { productHasDiscount, buildCartItem, getStockBadge } from "../lib/mappers";
 import SalePriceHighlight, { SaleRibbon } from "../components/SalePriceHighlight";
 
 function formatPKR(price) {
@@ -100,14 +100,7 @@ export default function ProductDetails() {
     ? [product.productImage, ...(product.images || [])]
     : product.images || [];
 
-  const stockBadge =
-    product.stockLevel === "out" || product.stock <= 0
-      ? { text: "Out of Stock", cls: "text-red-600" }
-      : product.stockLevel === "low"
-        ? { text: `Low Stock — only ${product.stock} left`, cls: "text-orange-600" }
-        : product.stockLevel === "medium"
-          ? { text: `Medium Stock — ${product.stock} available`, cls: "text-amber-600" }
-          : { text: `In Stock — ${product.stock} available`, cls: "text-emerald-600" };
+  const stockBadge = getStockBadge(product.stock, product.stockLevel);
 
   const onSale = productHasDiscount(product);
   const displayPrice = product.salePrice ?? product.price;
@@ -165,6 +158,7 @@ export default function ProductDetails() {
                 originalPrice={product.originalPrice}
                 discountPercent={product.discountPercent}
                 size="lg"
+                variant="card"
                 className="mb-4"
               />
             ) : (
@@ -173,7 +167,9 @@ export default function ProductDetails() {
               </div>
             )}
 
-            <p className={`font-semibold mb-6 ${stockBadge.cls}`}>{stockBadge.text}</p>
+            <span className={`inline-block mb-6 rounded-full px-3 py-1 text-sm font-bold ${stockBadge.className}`}>
+              {stockBadge.label}
+            </span>
 
             <div className="flex items-center gap-4 mb-6">
               <span className="text-sm font-semibold">Qty:</span>
@@ -226,6 +222,7 @@ export default function ProductDetails() {
                         originalPrice={relProd.originalPrice}
                         discountPercent={relProd.discountPercent}
                         size="sm"
+                        variant="card"
                         className="mt-2"
                       />
                     ) : (

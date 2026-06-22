@@ -255,6 +255,7 @@ export default function Orders() {
                           originalPrice={item.originalPrice}
                           discountPercent={item.discountPercent}
                           size="sm"
+                          variant="card"
                           className="mb-2"
                         />
                       ) : (
