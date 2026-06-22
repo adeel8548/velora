@@ -16,8 +16,6 @@ import {
 } from "../../services/promotionService";
 import { fetchAdminProducts } from "../../services/productService";
 import { fetchCategoriesAdmin } from "../../services/categoryService";
-import { getProductPricing } from "../../lib/mappers";
-
 function formatPKR(n) {
   return `Rs. ${Number(n || 0).toLocaleString("en-PK")}`;
 }
@@ -574,9 +572,7 @@ export default function AdminSales() {
                   </td>
                 </tr>
               ) : (
-                onSaleProducts.map((p) => {
-                  const pricing = getProductPricing(p);
-                  return (
+                onSaleProducts.map((p) => (
                     <tr key={p._id} className="hover:bg-slate-50/80">
                       <td className="px-4 py-3 font-medium">{p.name}</td>
                       <td className="px-4 py-3">{p.category}</td>
@@ -585,14 +581,13 @@ export default function AdminSales() {
                         {p.discountPercent}% OFF
                       </td>
                       <td className="px-4 py-3 text-right text-slate-400 line-through">
-                        {formatPKR(pricing.originalPrice)}
+                        {formatPKR(p.originalPrice)}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-emerald-700">
-                        {formatPKR(pricing.salePrice)}
+                        {formatPKR(p.salePrice ?? p.price)}
                       </td>
                     </tr>
-                  );
-                })
+                  ))
               )}
             </tbody>
           </table>

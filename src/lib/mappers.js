@@ -1,11 +1,22 @@
 /** Map Supabase row → frontend product shape (_id for legacy components) */
 export function getProductPricing(product) {
-  const originalPrice = Number(product?.price ?? 0);
   const discountPercent = Number(
     product?.discountPercent ?? product?.discount_percent ?? 0,
   );
-  // Apply discount whenever % is set (customer always sees sale price)
   const isSale = discountPercent > 0;
+
+  // Already mapped (mapProduct): originalPrice = list, salePrice/price = discounted
+  if (product?.originalPrice != null && product?.salePrice != null) {
+    return {
+      originalPrice: Number(product.originalPrice),
+      salePrice: Number(product.salePrice),
+      discountPercent,
+      isSale,
+    };
+  }
+
+  // Raw DB row: `price` column is list/MRP — calculate sale from discount %
+  const originalPrice = Number(product?.price ?? 0);
   const salePrice = isSale
     ? Math.round(originalPrice * (1 - discountPercent / 100))
     : originalPrice;
