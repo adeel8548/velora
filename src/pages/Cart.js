@@ -9,16 +9,21 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import ProductImage from "../components/ProductImage";
-
-function formatPKR(amount) {
-  return `Rs. ${Number(amount).toLocaleString("en-PK")}`;
-}
+import { formatPKR } from "../lib/format";
+import { cartItemHasSale } from "../lib/mappers";
+import SalePriceHighlight from "../components/SalePriceHighlight";
 
 export default function Cart() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const items = useSelector((state) => state.cart.items);
   const user = useSelector((state) => state.auth.user);
+
+  const totalSavings = items.reduce((sum, item) => {
+    if (!cartItemHasSale(item)) return sum;
+    const orig = Number(item.originalPrice ?? item.price);
+    return sum + (orig - item.price) * item.quantity;
+  }, 0);
 
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -98,10 +103,14 @@ export default function Cart() {
           {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="space-y-4">
-              {items.map((item, idx) => (
+              {items.map((item, idx) => {
+                const onSale = cartItemHasSale(item);
+                return (
                 <div
                   key={idx}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden border border-gray-100"
+                  className={`bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden border ${
+                    onSale ? "border-amber-400 ring-2 ring-amber-100" : "border-gray-100"
+                  }`}
                 >
                   <div className="flex flex-col sm:flex-row items-center gap-6 p-6">
                     {/* Product Image */}
@@ -127,9 +136,19 @@ export default function Cart() {
                       >
                         {item.name}
                       </Link>
-                      <p className="text-2xl font-bold text-amber-600 mb-4">
-                        {formatPKR(item.price)}
-                      </p>
+                      {onSale ? (
+                        <SalePriceHighlight
+                          salePrice={item.price}
+                          originalPrice={item.originalPrice}
+                          discountPercent={item.discountPercent}
+                          size="md"
+                          className="mb-4"
+                        />
+                      ) : (
+                        <p className="text-2xl font-bold text-amber-600 mb-4">
+                          {formatPKR(item.price)}
+                        </p>
+                      )}
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-4 bg-gray-100 p-2 rounded-lg w-fit">
@@ -159,9 +178,14 @@ export default function Cart() {
 
                     {/* Price and Actions */}
                     <div className="text-right">
-                      <div className="text-3xl font-bold text-amber-600 mb-4">
+                      <div className={`text-3xl font-bold mb-4 ${onSale ? "text-emerald-700" : "text-amber-600"}`}>
                         {formatPKR(item.price * item.quantity)}
                       </div>
+                      {onSale && (
+                        <p className="text-xs font-bold text-amber-700 mb-2">
+                          🏷️ Sale applied
+                        </p>
+                      )}
                       <button
                         onClick={() => handleRemoveItem(item.product)}
                         className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm"
@@ -171,7 +195,8 @@ export default function Cart() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
 
             {/* Continue Shopping */}
@@ -192,6 +217,12 @@ export default function Cart() {
 
               {/* Breakdown */}
               <div className="space-y-4 mb-6 pb-6 border-b-2 border-indigo-200">
+                {totalSavings > 0 && (
+                  <div className="flex justify-between text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                    <span className="font-medium">🎉 Sale Savings:</span>
+                    <span className="font-bold">− {formatPKR(totalSavings)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-700">
                   <span className="font-medium">Subtotal:</span>
                   <span className="font-semibold text-gray-900">

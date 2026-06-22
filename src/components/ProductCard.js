@@ -1,10 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { formatPKR } from "../lib/format";
+import { productHasDiscount } from "../lib/mappers";
+import SalePriceHighlight, { SaleRibbon } from "./SalePriceHighlight";
 
 export default function ProductCard({ product, onAdd }) {
+  const onSale = productHasDiscount(product);
+  const displayPrice = product.salePrice ?? product.price;
+
   return (
     <div className="bg-white soft-rounded overflow-hidden card-shadow hover:shadow-2xl transition transform hover:-translate-y-2">
       <div className="relative h-56 bg-gray-100 overflow-hidden">
+        {onSale && <SaleRibbon discountPercent={product.discountPercent} />}
         {product?.productImage || product?.images?.[0] ? (
           <img
             src={product.productImage || product.images?.[0]}
@@ -30,14 +37,18 @@ export default function ProductCard({ product, onAdd }) {
           <div className="text-sm text-gray-500">(120)</div>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <div>
-            <div className="text-xl font-bold text-slate-900">
-              ${product.price}
+          {onSale ? (
+            <SalePriceHighlight
+              salePrice={displayPrice}
+              originalPrice={product.originalPrice}
+              discountPercent={product.discountPercent}
+              size="sm"
+            />
+          ) : (
+            <div className={`text-xl font-bold text-slate-900`}>
+              {formatPKR(displayPrice)}
             </div>
-            <div className="text-sm text-gray-400 line-through">
-              ${(product.price * 1.15).toFixed(2)}
-            </div>
-          </div>
+          )}
           <div className="flex flex-col items-end gap-2">
             <button
               onClick={() => onAdd && onAdd(product)}

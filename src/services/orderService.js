@@ -18,7 +18,7 @@ export async function fetchAllOrdersAdmin() {
     .from("orders")
     .select(`
       *,
-      order_items(*),
+      order_items(*, products(cost_price)),
       profiles(full_name, email, phone, address_line, city, state)
     `)
     .order("created_at", { ascending: false });
@@ -80,6 +80,20 @@ export async function placeOrder({
 
   if (orderError) throw orderError;
 
+  const productIds = cartItems.map((item) => item.product).filter(Boolean);
+  const costByProduct = {};
+
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, cost_price")
+      .in("id", productIds);
+
+    (products || []).forEach((p) => {
+      costByProduct[p.id] = Number(p.cost_price ?? 0);
+    });
+  }
+
   const orderItems = cartItems.map((item) => ({
     order_id: order.id,
     product_id: item.product,
@@ -87,6 +101,9 @@ export async function placeOrder({
     product_image: item.image,
     quantity: item.quantity,
     unit_price: item.price,
+    original_unit_price: item.originalPrice ?? item.price,
+    discount_percent: item.discountPercent ?? 0,
+    unit_cost: costByProduct[item.product] ?? 0,
   }));
 
   const { error: itemsError } = await supabase

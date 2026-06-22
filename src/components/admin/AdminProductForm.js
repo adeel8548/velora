@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
 import {
   createProduct,
@@ -6,11 +6,25 @@ import {
   uploadProductImage,
   fetchCategories,
   fetchSubcategories,
+  fetchProductById,
 } from "../../services/productService";
 
 const SUBCATEGORY_NAMES = [
   "Watch", "Shoes", "Glasses", "Pants", "Shirt", "Shalwar Kameez",
 ];
+
+const EMPTY_FORM = {
+  name: "",
+  description: "",
+  price: "",
+  cost_price: "",
+  stock: "",
+  category: "",
+  subcategory: "",
+  product_image: "",
+  is_sale: false,
+  discount_percent: "",
+};
 
 export default function AdminProductForm({
   onSuccess,
@@ -18,40 +32,59 @@ export default function AdminProductForm({
   productId = null,
   onCancel,
 }) {
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    price: "",
-    stock: "",
-    category: "",
-    subcategory: "",
-    product_image: "",
-    is_sale: false,
-    discount_percent: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [productImageFile, setProductImageFile] = useState(null);
   const [existingImage, setExistingImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState(null);
   const [categories, setCategories] = useState([]);
 
+  const populateForm = useCallback((p) => {
+    if (!p) return;
+    const discount = Number(p.discountPercent ?? p.discount_percent ?? 0);
+    const onSale = discount > 0 || Boolean(p.isSale ?? p.is_sale);
+
+    setForm({
+      name: p.name || "",
+      description: p.description || "",
+      price: String(p.originalPrice ?? p.price ?? ""),
+      cost_price: String(p.costPrice ?? p.cost_price ?? ""),
+      stock: String(p.stock ?? ""),
+      category: p.category || "",
+      subcategory: p.subcategory || "",
+      product_image: p.productImage || p.product_image || "",
+      is_sale: onSale,
+      discount_percent: discount > 0 ? String(discount) : "",
+    });
+    setExistingImage(p.productImage || p.product_image || null);
+    setProductImageFile(null);
+  }, []);
+
   useEffect(() => {
     fetchCategories().then(setCategories).catch(() => {});
-    if (initialData) {
-      setForm({
-        name: initialData.name || "",
-        description: initialData.description || "",
-        price: initialData.originalPrice || initialData.price || "",
-        stock: initialData.stock ?? "",
-        category: initialData.category || "",
-        subcategory: initialData.subcategory || "",
-        product_image: initialData.productImage || "",
-        is_sale: initialData.isSale || false,
-        discount_percent: initialData.discountPercent || "",
-      });
-      setExistingImage(initialData.productImage || null);
+  }, []);
+
+  useEffect(() => {
+    if (productId) {
+      setFormLoading(true);
+      fetchProductById(productId)
+        .then(populateForm)
+        .catch(() => {
+          if (initialData) populateForm(initialData);
+        })
+        .finally(() => setFormLoading(false));
+      return;
     }
-  }, [initialData]);
+
+    if (initialData) {
+      populateForm(initialData);
+    } else {
+      setForm(EMPTY_FORM);
+      setExistingImage(null);
+      setProductImageFile(null);
+    }
+  }, [productId, initialData, populateForm]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -75,6 +108,7 @@ export default function AdminProductForm({
         name: form.name,
         description: form.description,
         price: parseFloat(form.price),
+        cost_price: parseFloat(form.cost_price) || 0,
         stock: parseInt(form.stock, 10) || 0,
         category: form.category,
         subcategory: form.subcategory,
@@ -82,10 +116,9 @@ export default function AdminProductForm({
         images: imageUrl ? [imageUrl] : [],
         is_active: true,
         is_sale: form.is_sale && discount > 0,
-        discount_percent: form.is_sale ? discount : 0,
+        discount_percent: form.is_sale && discount > 0 ? discount : 0,
       };
 
-      // Resolve category_id / subcategory_id if categories loaded
       const cat = categories.find((c) => c.name === form.category);
       if (cat) {
         payload.category_id = cat.id;
@@ -110,6 +143,18 @@ export default function AdminProductForm({
     }
   };
 
+  const listPrice = parseFloat(form.price) || 0;
+  const discountPct = parseInt(form.discount_percent, 10) || 0;
+  const previewSalePrice =
+    form.is_sale && discountPct > 0
+      ? Math.round(listPrice * (1 - discountPct / 100))
+      : listPrice;
+  const previewProfit = previewSalePrice - (parseFloat(form.cost_price) || 0);
+
+  if (formLoading) {
+    return <p className="text-slate-500 text-sm py-8 text-center">Loading product...</p>;
+  }
+
   return (
     <div className="p-2">
       {error && <div className="mb-3 text-red-600 text-sm">{error}</div>}
@@ -132,9 +177,16 @@ export default function AdminProductForm({
           onChange={handleChange}
         />
         <div className="grid grid-cols-2 gap-4">
-          <input type="number" name="price" className="border rounded-xl px-4 py-2.5" placeholder="Original Price (PKR) *" value={form.price} onChange={handleChange} required />
-          <input type="number" name="stock" className="border rounded-xl px-4 py-2.5" placeholder="Stock qty *" value={form.stock} onChange={handleChange} required min="0" />
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Selling Price (List) PKR *</label>
+            <input type="number" name="price" className="w-full border rounded-xl px-4 py-2.5" placeholder="e.g. 5000" value={form.price} onChange={handleChange} required min="0" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cost / Purchase PKR</label>
+            <input type="number" name="cost_price" className="w-full border rounded-xl px-4 py-2.5" placeholder="e.g. 3500" value={form.cost_price} onChange={handleChange} min="0" />
+          </div>
         </div>
+        <input type="number" name="stock" className="w-full border rounded-xl px-4 py-2.5" placeholder="Stock qty *" value={form.stock} onChange={handleChange} required min="0" />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             <input
@@ -142,7 +194,7 @@ export default function AdminProductForm({
               checked={form.is_sale}
               onChange={(e) => setForm({ ...form, is_sale: e.target.checked })}
             />
-            On Sale (this product)
+            On Sale (discount on this product)
           </label>
           {form.is_sale && (
             <input
@@ -155,6 +207,22 @@ export default function AdminProductForm({
               value={form.discount_percent}
               onChange={handleChange}
             />
+          )}
+          {(listPrice > 0 || form.cost_price) && (
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-lg bg-white px-2 py-2 border">
+                <p className="text-slate-400">Web Price</p>
+                <p className="font-bold text-emerald-700">Rs. {previewSalePrice.toLocaleString("en-PK")}</p>
+              </div>
+              <div className="rounded-lg bg-white px-2 py-2 border">
+                <p className="text-slate-400">Cost</p>
+                <p className="font-bold">Rs. {(parseFloat(form.cost_price) || 0).toLocaleString("en-PK")}</p>
+              </div>
+              <div className="rounded-lg bg-violet-50 px-2 py-2 border border-violet-100">
+                <p className="text-violet-500">Profit / unit</p>
+                <p className="font-bold text-violet-700">Rs. {previewProfit.toLocaleString("en-PK")}</p>
+              </div>
+            </div>
           )}
         </div>
         <div className="grid grid-cols-2 gap-4">

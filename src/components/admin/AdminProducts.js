@@ -8,11 +8,8 @@ import {
   fetchAdminProducts,
   deleteProduct,
 } from "../../services/productService";
-import { getStockBadge } from "../../lib/mappers";
-
-function formatPKR(price) {
-  return `Rs. ${Number(price).toLocaleString("en-PK")}`;
-}
+import { getStockBadge, getProductProfit } from "../../lib/mappers";
+import { formatPKR } from "../../lib/format";
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -116,7 +113,9 @@ export default function AdminProducts() {
             <thead className="bg-slate-50 border-b">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Product</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">Price</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Selling Price</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Cost</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Profit</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Stock</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Category</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
@@ -125,6 +124,10 @@ export default function AdminProducts() {
             <tbody className="divide-y">
               {filteredProducts.map((p) => {
                 const badge = getStockBadge(p.stock, p.stockLevel);
+                const profit = getProductProfit(p);
+                const sellingPrice = p.salePrice ?? p.price;
+                const onSale = p.isSale && p.discountPercent > 0;
+
                 return (
                   <tr key={p._id} className="hover:bg-slate-50">
                     <td className="px-6 py-4">
@@ -139,15 +142,24 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {p.isSale && p.discountPercent > 0 ? (
+                      {onSale ? (
                         <div>
-                          <p className="font-bold text-emerald-700">{formatPKR(p.price)}</p>
+                          <p className="font-bold text-emerald-700">{formatPKR(sellingPrice)}</p>
                           <p className="text-xs text-slate-400 line-through">{formatPKR(p.originalPrice)}</p>
                           <span className="text-xs font-bold text-amber-600">{p.discountPercent}% OFF</span>
                         </div>
                       ) : (
-                        <span className="font-bold">{formatPKR(p.price)}</span>
+                        <span className="font-bold">{formatPKR(sellingPrice)}</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-slate-600">{formatPKR(p.costPrice)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`font-bold ${profit >= 0 ? "text-violet-700" : "text-red-600"}`}>
+                        {formatPKR(profit)}
+                      </span>
+                      <p className="text-[10px] text-slate-400">per unit</p>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${badge.className}`}>

@@ -4,10 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { clearCart } from "../store/cartSlice";
 import { createOrder } from "../store/orderSlice";
 import Swal from "sweetalert2";
-
-function formatPKR(amount) {
-  return `Rs. ${Number(amount).toLocaleString("en-PK")}`;
-}
+import { cartItemHasSale } from "../lib/mappers";
+import { formatPKR } from "../lib/format";
+import SalePriceHighlight from "../components/SalePriceHighlight";
 
 export default function Checkout() {
   const { user } = useSelector((state) => state.auth);
@@ -35,6 +34,10 @@ export default function Checkout() {
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
+  const totalSavings = cartItems.reduce((sum, item) => {
+    if (!cartItemHasSale(item)) return sum;
+    return sum + (Number(item.originalPrice) - item.price) * item.quantity;
+  }, 0);
   const tax = cartTotal * 0.1;
   const shipping = cartTotal > 5000 ? 0 : 250;
   const finalTotal = cartTotal + tax + shipping;
@@ -357,40 +360,61 @@ export default function Checkout() {
 
                 {/* Items */}
                 <div className="mb-6 pb-6 border-b-2 border-indigo-200 max-h-64 overflow-y-auto">
-                  {cartItems.map((item, idx) => (
+                  {cartItems.map((item, idx) => {
+                    const onSale = cartItemHasSale(item);
+                    return (
                     <div
                       key={idx}
-                      className="flex justify-between items-start mb-4 text-sm"
+                      className={`flex justify-between items-start mb-4 text-sm rounded-xl p-3 ${
+                        onSale ? "bg-amber-50 border border-amber-200" : ""
+                      }`}
                     >
-                      <div>
+                      <div className="flex-1 pr-2">
                         <p className="font-semibold text-gray-900 line-clamp-2">
                           {item.name}
                         </p>
                         <p className="text-gray-600">Qty: {item.quantity}</p>
+                        {onSale && (
+                          <SalePriceHighlight
+                            salePrice={item.price}
+                            originalPrice={item.originalPrice}
+                            discountPercent={item.discountPercent}
+                            size="sm"
+                            layout="inline"
+                            className="mt-2"
+                          />
+                        )}
                       </div>
-                      <p className="font-bold text-indigo-600 flex-shrink-0 ml-2">
-                        ${(item.price * item.quantity).toFixed(2)}
+                      <p className={`font-bold flex-shrink-0 ml-2 ${onSale ? "text-emerald-700" : "text-indigo-600"}`}>
+                        {formatPKR(item.price * item.quantity)}
                       </p>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 {/* Pricing Breakdown */}
                 <div className="space-y-3 pb-6 border-b-2 border-indigo-200">
+                  {totalSavings > 0 && (
+                    <div className="flex justify-between text-amber-700 bg-amber-50 rounded-lg px-3 py-2 text-sm">
+                      <span className="font-medium">Sale Savings</span>
+                      <span className="font-bold">− {formatPKR(totalSavings)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-700">
                     <span className="font-medium">Subtotal:</span>
-                    <span className="font-semibold">${cartTotal.toFixed(2)}</span>
+                    <span className="font-semibold">{formatPKR(cartTotal)}</span>
                   </div>
                   <div className="flex justify-between text-gray-700">
                     <span className="font-medium">Tax (10%):</span>
-                    <span className="font-semibold">${tax}</span>
+                    <span className="font-semibold">{formatPKR(tax)}</span>
                   </div>
                   <div className="flex justify-between text-gray-700">
                     <span className="font-medium">Shipping:</span>
                     {shipping === 0 ? (
                       <span className="font-semibold text-green-600">FREE ✓</span>
                     ) : (
-                      <span className="font-semibold">${shipping.toFixed(2)}</span>
+                      <span className="font-semibold">{formatPKR(shipping)}</span>
                     )}
                   </div>
                 </div>
@@ -399,7 +423,7 @@ export default function Checkout() {
                 <div className="flex justify-between items-center mb-8 text-xl bg-white rounded-lg p-4 mt-6">
                   <span className="font-bold text-gray-900">Total:</span>
                   <span className="text-3xl font-bold text-indigo-600">
-                    ${finalTotal}
+                    {formatPKR(finalTotal)}
                   </span>
                 </div>
 

@@ -5,6 +5,8 @@ import { fetchProducts } from "../store/productSlice";
 import { addItem } from "../store/cartSlice";
 
 import ProductImage from "../components/ProductImage";
+import { productHasDiscount, buildCartItem } from "../lib/mappers";
+import SalePriceHighlight, { SaleRibbon } from "../components/SalePriceHighlight";
 
 const CATEGORY_CARDS = [
   {
@@ -44,15 +46,7 @@ export default function LandingPage() {
   }, [dispatch]);
 
   const handleAddToCart = (product) => {
-    dispatch(
-      addItem({
-        product: product._id,
-        name: product.name,
-        price: product.price,
-        image: product.productImage || product.images?.[0],
-        quantity: 1,
-      }),
-    );
+    dispatch(addItem(buildCartItem(product, 1)));
     setAddedId(product._id);
     setTimeout(() => setAddedId(null), 2000);
   };
@@ -219,23 +213,25 @@ export default function LandingPage() {
             {displayProducts.map((product) => (
               <div
                 key={product._id}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:shadow-lg"
+                className={`group overflow-hidden rounded-2xl border bg-white transition hover:shadow-lg ${
+                  productHasDiscount(product)
+                    ? "border-amber-400 ring-2 ring-amber-100"
+                    : "border-slate-200"
+                }`}
               >
                 <Link
                   to={`/product/${product._id}`}
                   className="relative block aspect-square overflow-hidden bg-slate-100"
                 >
+                  {productHasDiscount(product) && (
+                    <SaleRibbon discountPercent={product.discountPercent} />
+                  )}
                   <ProductImage
                     src={product.productImage || product.images?.[0]}
                     alt={product.name}
                     productId={product._id}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
-                  {product.isSale && (
-                    <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                      SALE
-                    </span>
-                  )}
                 </Link>
                 <div className="p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
@@ -244,9 +240,19 @@ export default function LandingPage() {
                   <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900">
                     {product.name}
                   </h3>
-                  <p className="mt-2 text-base font-bold text-slate-900">
-                    {formatPKR(product.price)}
-                  </p>
+                  {productHasDiscount(product) ? (
+                    <SalePriceHighlight
+                      salePrice={product.salePrice ?? product.price}
+                      originalPrice={product.originalPrice}
+                      discountPercent={product.discountPercent}
+                      size="sm"
+                      className="mt-2"
+                    />
+                  ) : (
+                    <p className="mt-2 text-base font-bold text-slate-900">
+                      {formatPKR(product.price)}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleAddToCart(product)}

@@ -7,7 +7,9 @@ import {
   fetchSalesAnalytics,
   fetchSalesRecords,
 } from "../../services/adminService";
-import { fetchCategoriesAdmin } from "../../services/categoryService";
+import { fetchAdminProducts } from "../../services/productService";
+import { getProductProfit } from "../../lib/mappers";
+import { formatPKR } from "../../lib/format";
 import {
   fetchPromotions,
   getPromotionScheduleStatus,
@@ -16,10 +18,7 @@ import {
   promotionTargetLabel,
   syncScheduledPromotions,
 } from "../../services/promotionService";
-
-function formatPKR(n) {
-  return `Rs. ${Number(n || 0).toLocaleString("en-PK")}`;
-}
+import { fetchCategoriesAdmin } from "../../services/categoryService";
 
 const SUBCATEGORIES = [
   "Watch", "Shoes", "Glasses", "Pants", "Shirt", "Shalwar Kameez",
@@ -27,6 +26,7 @@ const SUBCATEGORIES = [
 
 const EMPTY_SALES = {
   totalRevenue: 0,
+  totalProfit: 0,
   totalOrders: 0,
   totalItems: 0,
   chartData: [],
@@ -45,6 +45,7 @@ export default function AdminDashboardHome() {
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState([]);
 
   useEffect(() => {
     fetchCategoriesAdmin().then(setCategories).catch(() => {});
@@ -57,7 +58,7 @@ export default function AdminDashboardHome() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsData, salesData, promoData, ledgerData] = await Promise.all([
+      const [statsData, salesData, promoData, ledgerData, productsData] = await Promise.all([
         withTimeout(fetchDashboardStats(), 8000, null).catch(() => null),
         withTimeout(
           fetchSalesAnalytics({ period, category, subcategory }),
@@ -66,12 +67,14 @@ export default function AdminDashboardHome() {
         ).catch(() => EMPTY_SALES),
         withTimeout(syncScheduledPromotions().then(() => fetchPromotions()), 8000, []).catch(() => []),
         withTimeout(fetchSalesRecords({ period, category, subcategory }), 12000, { rows: [], summary: {} }).catch(() => ({ rows: [], summary: {} })),
+        withTimeout(fetchAdminProducts(), 8000, []).catch(() => []),
       ]);
       setStats(statsData);
       setSales(salesData);
       setPromotions(promoData || []);
       setSalesLedger((ledgerData?.rows || []).slice(0, 8));
       setLedgerSummary(ledgerData?.summary);
+      setProducts(productsData || []);
     } catch (e) {
       console.error(e);
       setSales(EMPTY_SALES);
@@ -86,12 +89,36 @@ export default function AdminDashboardHome() {
   const livePromos = promotions.filter((p) => getPromotionScheduleStatus(p, now) === "live");
   const upcomingPromos = promotions.filter((p) => getPromotionScheduleStatus(p, now) === "upcoming");
 
+  const productMargins = products.map((p) => ({
+    id: p._id,
+    name: p.name,
+    selling: p.salePrice ?? p.price,
+    cost: p.costPrice ?? 0,
+    profit: getProductProfit(p),
+    onSale: p.isSale && p.discountPercent > 0,
+  }));
+  const avgUnitProfit = productMargins.length
+    ? productMargins.reduce((sum, p) => sum + p.profit, 0) / productMargins.length
+    : 0;
+
   const statCards = [
     {
       label: "Total Revenue",
       value: formatPKR(sales?.totalRevenue),
       sub: `${period} filter`,
       color: "from-emerald-500 to-teal-600",
+    },
+    {
+      label: "Total Profit",
+      value: formatPKR(sales?.totalProfit ?? ledgerSummary?.totalProfit),
+      sub: "Sold price − cost price",
+      color: "from-violet-500 to-purple-600",
+    },
+    {
+      label: "Avg Product Profit",
+      value: formatPKR(avgUnitProfit),
+      sub: "Selling − cost (per unit)",
+      color: "from-violet-600 to-indigo-700",
     },
     {
       label: "Orders",
@@ -116,6 +143,12 @@ export default function AdminDashboardHome() {
       value: formatPKR(ledgerSummary?.totalRevenue),
       sub: `${ledgerSummary?.totalOrders ?? 0} orders (sales table)`,
       color: "from-cyan-500 to-blue-600",
+    },
+    {
+      label: "Ledger Profit",
+      value: formatPKR(ledgerSummary?.totalProfit),
+      sub: "Per-product margin",
+      color: "from-fuchsia-500 to-pink-600",
     },
     {
       label: "All-Time Revenue",
@@ -330,7 +363,8 @@ export default function AdminDashboardHome() {
                       <tr className="border-b text-left text-slate-500">
                         <th className="pb-2 font-semibold">Product</th>
                         <th className="pb-2 font-semibold">Customer</th>
-                        <th className="pb-2 font-semibold text-right">Amount</th>
+                        <th className="pb-2 font-semibold text-right">Revenue</th>
+                        <th className="pb-2 font-semibold text-right">Profit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -339,6 +373,7 @@ export default function AdminDashboardHome() {
                           <td className="py-2 line-clamp-1">{r.productName}</td>
                           <td className="py-2 text-slate-500">{r.customerName}</td>
                           <td className="py-2 text-right font-bold text-emerald-700">{formatPKR(r.lineTotal)}</td>
+                          <td className="py-2 text-right font-bold text-violet-700">{formatPKR(r.lineProfit)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -346,6 +381,45 @@ export default function AdminDashboardHome() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Product profit margins */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-slate-900">Product Profit (per unit)</h2>
+              <Link to="/admin/products" className="text-sm text-amber-600 font-semibold">All products →</Link>
+            </div>
+            {productMargins.length === 0 ? (
+              <p className="text-slate-400 text-sm py-6 text-center">No products yet</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-slate-500">
+                      <th className="pb-2 font-semibold">Product</th>
+                      <th className="pb-2 font-semibold text-right">Selling</th>
+                      <th className="pb-2 font-semibold text-right">Cost</th>
+                      <th className="pb-2 font-semibold text-right">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productMargins.slice(0, 8).map((p) => (
+                      <tr key={p.id} className="border-b border-slate-50">
+                        <td className="py-2 font-medium line-clamp-1">
+                          {p.name}
+                          {p.onSale && (
+                            <span className="ml-1 text-[10px] font-bold text-amber-600 uppercase">Sale</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right text-emerald-700 font-semibold">{formatPKR(p.selling)}</td>
+                        <td className="py-2 text-right text-slate-500">{formatPKR(p.cost)}</td>
+                        <td className="py-2 text-right font-bold text-violet-700">{formatPKR(p.profit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Recent orders */}
@@ -372,7 +446,14 @@ export default function AdminDashboardHome() {
                         {new Date(o.created_at).toLocaleDateString("en-PK")}
                       </td>
                       <td className="py-3">
-                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
+                          o.status === "delivered" ? "bg-emerald-100 text-emerald-700"
+                          : o.status === "shipped" ? "bg-purple-100 text-purple-700"
+                          : o.status === "processing" ? "bg-indigo-100 text-indigo-700"
+                          : o.status === "cancelled" ? "bg-red-100 text-red-700"
+                          : o.status === "confirmed" ? "bg-blue-100 text-blue-700"
+                          : "bg-yellow-100 text-yellow-700"
+                        }`}>
                           {o.status}
                         </span>
                       </td>

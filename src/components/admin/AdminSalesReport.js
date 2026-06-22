@@ -55,9 +55,10 @@ export default function AdminSalesReport() {
       </div>
 
       {summary && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-4">
+        <div className="mb-6 grid gap-4 sm:grid-cols-5">
           {[
             { label: "Revenue", val: formatPKR(summary.totalRevenue) },
+            { label: "Profit", val: formatPKR(summary.totalProfit) },
             { label: "Orders", val: summary.totalOrders },
             { label: "Items Sold", val: summary.totalItems },
             { label: "Avg Order", val: formatPKR(summary.avgOrderValue) },
@@ -83,13 +84,14 @@ export default function AdminSalesReport() {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3 text-center">Qty</th>
-                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3 text-right">Revenue</th>
+                <th className="px-4 py-3 text-right">Profit</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
                     No sales in this period
                   </td>
                 </tr>
@@ -106,6 +108,9 @@ export default function AdminSalesReport() {
                     <td className="px-4 py-3 text-center">{r.quantity}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-700">
                       {formatPKR(r.lineTotal)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-violet-700">
+                      {formatPKR(r.lineProfit)}
                     </td>
                   </tr>
                 ))

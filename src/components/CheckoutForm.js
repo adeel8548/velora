@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { clearCart } from "../store/cartSlice";
 import api from "../api";
+import { formatPKR } from "../lib/format";
 
 export default function CheckoutForm({ clientSecret }) {
   const stripe = useStripe();
@@ -160,7 +161,7 @@ export default function CheckoutForm({ clientSecret }) {
       <div className="mb-4 p-3 bg-gray-50 rounded">
         <div className="flex justify-between text-sm mb-2">
           <span>Total Amount:</span>
-          <span className="font-bold text-indigo-600">${total.toFixed(2)}</span>
+          <span className="font-bold text-indigo-600">{formatPKR(total)}</span>
         </div>
       </div>
 
@@ -175,7 +176,7 @@ export default function CheckoutForm({ clientSecret }) {
         className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-semibold disabled:bg-gray-400"
         disabled={!stripe || loading || !clientSecret}
       >
-        {loading ? "Processing..." : `Pay $${total.toFixed(2)}`}
+        {loading ? "Processing..." : `Pay ${formatPKR(total)}`}
       </button>
     </form>
   );

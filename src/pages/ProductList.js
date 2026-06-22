@@ -7,17 +7,27 @@ import FilterSidebar from "../components/FilterSidebar";
 import LandingPage from "./LandingPage";
 import ProductImage from "../components/ProductImage";
 import Swal from "sweetalert2";
+import { productHasDiscount, buildCartItem } from "../lib/mappers";
+import SalePriceHighlight, { SaleRibbon } from "../components/SalePriceHighlight";
 
 function formatPKR(price) {
-  return `Rs. ${price.toLocaleString("en-PK")}`;
+  return `Rs. ${Number(price || 0).toLocaleString("en-PK")}`;
 }
 
 function ProductCard({ product, onAddToCart, addedId }) {
-  const showStrike = product.isSale && product.discountPercent > 0;
+  const onSale = productHasDiscount(product);
+  const displayPrice = product.salePrice ?? product.price;
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-amber-200 hover:shadow-xl hover:shadow-amber-500/5">
+    <article
+      className={`group overflow-hidden rounded-2xl border bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+        onSale
+          ? "border-amber-400 ring-2 ring-amber-200/70 shadow-amber-100/50 hover:border-amber-500 hover:shadow-amber-200/40"
+          : "border-slate-200/80 hover:border-amber-200 hover:shadow-amber-500/5"
+      }`}
+    >
       <Link to={`/product/${product._id}`} className="relative block aspect-[4/5] overflow-hidden bg-slate-100">
+        {onSale && <SaleRibbon discountPercent={product.discountPercent} />}
         <ProductImage
           src={product.productImage || product.images?.[0]}
           alt={product.name}
@@ -30,9 +40,9 @@ function ProductCard({ product, onAddToCart, addedId }) {
               New
             </span>
           )}
-          {product.isSale && product.discountPercent > 0 && (
-            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-              {product.discountPercent}% OFF
+          {onSale && (
+            <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow">
+              🏷️ Sale · {product.discountPercent}% OFF
             </span>
           )}
         </div>
@@ -62,16 +72,19 @@ function ProductCard({ product, onAddToCart, addedId }) {
           <span className="text-xs text-slate-400">({product.reviews})</span>
         </div>
 
-        <div className="mb-4 flex items-baseline gap-2">
-          <span className="text-lg font-bold text-slate-900">
-            {formatPKR(product.price)}
-          </span>
-          {showStrike && (
-            <span className="text-xs text-slate-400 line-through">
-              {formatPKR(product.originalPrice)}
-            </span>
-          )}
-        </div>
+        {onSale ? (
+          <SalePriceHighlight
+            salePrice={displayPrice}
+            originalPrice={product.originalPrice}
+            discountPercent={product.discountPercent}
+            size="md"
+            className="mb-4"
+          />
+        ) : (
+          <div className="mb-4">
+            <span className="text-lg font-bold text-slate-900">{formatPKR(displayPrice)}</span>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button
@@ -132,15 +145,7 @@ export default function ProductList() {
   }, [location.search]);
 
   const handleAddToCart = (product) => {
-    dispatch(
-      addItem({
-        product: product._id,
-        name: product.name,
-        price: product.price,
-        image: product.productImage || product.images?.[0],
-        quantity: 1,
-      }),
-    );
+    dispatch(addItem(buildCartItem(product, 1)));
     setAddedId(product._id);
     Swal.fire({
       title: "Added to Bag!",

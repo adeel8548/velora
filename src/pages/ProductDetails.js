@@ -9,6 +9,8 @@ import {
 import { getDemoProductById, getRelatedDemoProducts } from "../data/demoProducts";
 import ProductImage from "../components/ProductImage";
 import Swal from "sweetalert2";
+import { productHasDiscount, buildCartItem } from "../lib/mappers";
+import SalePriceHighlight, { SaleRibbon } from "../components/SalePriceHighlight";
 
 function formatPKR(price) {
   return `Rs. ${price?.toLocaleString("en-PK")}`;
@@ -55,15 +57,7 @@ export default function ProductDetails() {
   const handleAddToCart = () => {
     if (!product || quantity <= 0 || product.stock <= 0) return;
 
-    dispatch(
-      addItem({
-        product: product._id || product.id,
-        name: product.name,
-        price: product.price,
-        image: mainImage,
-        quantity: parseInt(quantity, 10),
-      }),
-    );
+    dispatch(addItem(buildCartItem(product, parseInt(quantity, 10))));
 
     setAddedToCart(true);
     Swal.fire({
@@ -115,6 +109,9 @@ export default function ProductDetails() {
           ? { text: `Medium Stock — ${product.stock} available`, cls: "text-amber-600" }
           : { text: `In Stock — ${product.stock} available`, cls: "text-emerald-600" };
 
+  const onSale = productHasDiscount(product);
+  const displayPrice = product.salePrice ?? product.price;
+
   return (
     <div className="bg-slate-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
@@ -128,7 +125,8 @@ export default function ProductDetails() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-white rounded-2xl shadow-sm p-8 mb-12">
           <div>
-            <div className="mb-4 bg-slate-100 rounded-xl overflow-hidden aspect-square">
+            <div className="mb-4 bg-slate-100 rounded-xl overflow-hidden aspect-square relative">
+              {onSale && <SaleRibbon discountPercent={product.discountPercent} />}
               <ProductImage
                 src={mainImage}
                 alt={product.name}
@@ -161,19 +159,19 @@ export default function ProductDetails() {
             <h1 className="text-3xl font-bold text-slate-900 mb-4">{product.name}</h1>
             <p className="text-slate-600 mb-6">{product.description}</p>
 
-            <div className="flex items-baseline gap-3 mb-4">
-              <span className="text-4xl font-bold text-slate-900">{formatPKR(product.price)}</span>
-              {product.isSale && product.discountPercent > 0 && (
-                <>
-                  <span className="text-lg text-slate-400 line-through">
-                    {formatPKR(product.originalPrice)}
-                  </span>
-                  <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-bold text-white">
-                    {product.discountPercent}% OFF
-                  </span>
-                </>
-              )}
-            </div>
+            {onSale ? (
+              <SalePriceHighlight
+                salePrice={displayPrice}
+                originalPrice={product.originalPrice}
+                discountPercent={product.discountPercent}
+                size="lg"
+                className="mb-4"
+              />
+            ) : (
+              <div className="mb-4">
+                <span className="text-4xl font-bold text-slate-900">{formatPKR(displayPrice)}</span>
+              </div>
+            )}
 
             <p className={`font-semibold mb-6 ${stockBadge.cls}`}>{stockBadge.text}</p>
 
@@ -208,8 +206,12 @@ export default function ProductDetails() {
                   key={relProd._id}
                   type="button"
                   onClick={() => navigate(`/product/${relProd._id}`)}
-                  className="bg-white rounded-xl shadow-sm overflow-hidden text-left hover:shadow-md transition"
+                  className="bg-white rounded-xl shadow-sm overflow-hidden text-left hover:shadow-md transition relative border border-slate-100 data-[sale]:border-amber-300 data-[sale]:ring-1 data-[sale]:ring-amber-200"
+                  data-sale={productHasDiscount(relProd) ? true : undefined}
                 >
+                  {productHasDiscount(relProd) && (
+                    <SaleRibbon discountPercent={relProd.discountPercent} />
+                  )}
                   <ProductImage
                     src={relProd.productImage}
                     alt={relProd.name}
@@ -218,7 +220,17 @@ export default function ProductDetails() {
                   />
                   <div className="p-4">
                     <h3 className="font-semibold line-clamp-2 text-sm">{relProd.name}</h3>
-                    <p className="font-bold mt-2">{formatPKR(relProd.price)}</p>
+                    {productHasDiscount(relProd) ? (
+                      <SalePriceHighlight
+                        salePrice={relProd.salePrice ?? relProd.price}
+                        originalPrice={relProd.originalPrice}
+                        discountPercent={relProd.discountPercent}
+                        size="sm"
+                        className="mt-2"
+                      />
+                    ) : (
+                      <p className="font-bold mt-2">{formatPKR(relProd.price)}</p>
+                    )}
                   </div>
                 </button>
               ))}

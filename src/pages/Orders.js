@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { fetchUserOrders } from "../store/orderSlice";
+import { formatPKR } from "../lib/format";
+import { orderItemHasSale, calcOrderSavings } from "../lib/mappers";
+import OrderBarcode from "../components/admin/OrderBarcode";
+import SalePriceHighlight from "../components/SalePriceHighlight";
 
 export default function Orders() {
   const navigate = useNavigate();
@@ -185,7 +189,11 @@ export default function Orders() {
 
         {/* Orders List */}
         <div className="space-y-6">
-          {filteredOrders.map((order) => (
+          {filteredOrders.map((order) => {
+            const orderSavings = calcOrderSavings(order.items || []);
+            const orderNo = order.order_number || order._id?.slice(0, 12);
+
+            return (
             <div
               key={order._id}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden"
@@ -195,7 +203,10 @@ export default function Orders() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-gray-600 text-sm font-semibold">Order ID</p>
-                    <p className="text-gray-900 font-bold">{order._id?.substring(0, 12)}...</p>
+                    <p className="text-gray-900 font-bold">{orderNo}</p>
+                    <div className="mt-2 scale-75 origin-left">
+                      <OrderBarcode value={order.order_number || order._id} height={32} />
+                    </div>
                   </div>
                   <div>
                     <p className="text-gray-600 text-sm font-semibold">Order Date</p>
@@ -216,7 +227,7 @@ export default function Orders() {
                   <div>
                     <p className="text-gray-600 text-sm font-semibold">Total Amount</p>
                     <p className="text-indigo-600 font-bold text-lg">
-                      ${order.totalAmount?.toFixed(2) || "0.00"}
+                      {formatPKR(order.totalAmount)}
                     </p>
                   </div>
                 </div>
@@ -226,27 +237,41 @@ export default function Orders() {
               <div className="p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Items</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {order.items?.map((item, idx) => (
+                  {order.items?.map((item, idx) => {
+                    const onSale = orderItemHasSale(item);
+                    return (
                     <div
                       key={idx}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                      className={`border rounded-lg p-4 hover:shadow-md transition ${
+                        onSale ? "border-amber-300 bg-amber-50/50 ring-1 ring-amber-200" : "border-gray-200"
+                      }`}
                     >
                       <p className="text-gray-900 font-semibold line-clamp-2 mb-2">
                         {item.productName || item.product}
                       </p>
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-gray-600 text-sm">
-                          Qty: {item.quantity}
-                        </span>
-                        <span className="text-indigo-600 font-bold">
-                          ${item.price?.toFixed(2) || "0.00"}
-                        </span>
-                      </div>
+                      {onSale ? (
+                        <SalePriceHighlight
+                          salePrice={item.price}
+                          originalPrice={item.originalPrice}
+                          discountPercent={item.discountPercent}
+                          size="sm"
+                          className="mb-2"
+                        />
+                      ) : (
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-gray-600 text-sm">Qty: {item.quantity}</span>
+                          <span className="text-indigo-600 font-bold">{formatPKR(item.price)}</span>
+                        </div>
+                      )}
+                      {onSale && (
+                        <p className="text-gray-600 text-sm mb-2">Qty: {item.quantity}</p>
+                      )}
                       <div className="text-xs text-gray-500">
-                        Total: ${(item.price * item.quantity)?.toFixed(2) || "0.00"}
+                        Line total: {formatPKR(item.price * item.quantity)}
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
 
@@ -289,32 +314,38 @@ export default function Orders() {
               {/* Order Summary */}
               <div className="border-t border-gray-200 p-6 bg-white">
                 <div className="flex justify-end gap-8 max-w-md ml-auto">
+                  {orderSavings > 0 && (
+                    <div>
+                      <p className="text-amber-600 text-sm">Sale Savings</p>
+                      <p className="text-amber-700 font-bold">− {formatPKR(orderSavings)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-gray-600 text-sm">Subtotal</p>
                     <p className="text-gray-900 font-bold">
-                      ${(
-                        (order.totalAmount -
+                      {formatPKR(
+                        order.totalAmount -
                           (order.taxAmount || 0) -
-                          (order.shippingAmount || 0)) / 1
-                      ).toFixed(2)}
+                          (order.shippingAmount || 0),
+                      )}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600 text-sm">Tax</p>
                     <p className="text-gray-900 font-bold">
-                      ${(order.taxAmount || 0).toFixed(2)}
+                      {formatPKR(order.taxAmount)}
                     </p>
                   </div>
                   <div>
                     <p className="text-gray-600 text-sm">Shipping</p>
                     <p className="text-gray-900 font-bold">
-                      ${(order.shippingAmount || 0).toFixed(2)}
+                      {formatPKR(order.shippingAmount)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-gray-600 text-sm">Total</p>
                     <p className="text-indigo-600 font-bold text-xl">
-                      ${order.totalAmount?.toFixed(2) || "0.00"}
+                      {formatPKR(order.totalAmount)}
                     </p>
                   </div>
                 </div>
@@ -333,7 +364,8 @@ export default function Orders() {
                 </button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
     </div>

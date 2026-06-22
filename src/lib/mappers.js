@@ -4,13 +4,52 @@ export function getProductPricing(product) {
   const discountPercent = Number(
     product?.discountPercent ?? product?.discount_percent ?? 0,
   );
-  const isSale =
-    Boolean(product?.isSale ?? product?.is_sale) && discountPercent > 0;
+  // Apply discount whenever % is set (customer always sees sale price)
+  const isSale = discountPercent > 0;
   const salePrice = isSale
     ? Math.round(originalPrice * (1 - discountPercent / 100))
     : originalPrice;
 
   return { originalPrice, salePrice, discountPercent, isSale };
+}
+
+export function productHasDiscount(product) {
+  return Number(product?.discountPercent ?? product?.discount_percent ?? 0) > 0;
+}
+
+/** Cart line item with sale price snapshot */
+export function buildCartItem(product, quantity = 1) {
+  const pricing = getProductPricing(product);
+  return {
+    product: product._id || product.id,
+    name: product.name,
+    price: pricing.salePrice,
+    originalPrice: pricing.originalPrice,
+    discountPercent: pricing.discountPercent,
+    image: product.productImage || product.images?.[0] || null,
+    quantity,
+  };
+}
+
+export function cartItemHasSale(item) {
+  const discount = Number(item?.discountPercent ?? 0);
+  const original = Number(item?.originalPrice ?? item?.price ?? 0);
+  const sale = Number(item?.price ?? 0);
+  return discount > 0 || original > sale;
+}
+
+export function orderItemHasSale(item) {
+  const discount = Number(item?.discountPercent ?? item?.discount_percent ?? 0);
+  const original = Number(item?.originalPrice ?? item?.original_unit_price ?? 0);
+  const sale = Number(item?.price ?? item?.unit_price ?? 0);
+  return discount > 0 || (original > 0 && original > sale);
+}
+
+/** Profit per unit = customer selling price − purchase/cost price */
+export function getProductProfit(product) {
+  const pricing = getProductPricing(product);
+  const cost = Number(product?.costPrice ?? product?.cost_price ?? 0);
+  return pricing.salePrice - cost;
 }
 
 export function mapProduct(row) {
@@ -46,6 +85,9 @@ export function mapProduct(row) {
     is_active: row.is_active,
     stockLevel: row.stock_level,
     stockLabel: row.stock_label,
+    costPrice: Number(row.cost_price ?? 0),
+    cost_price: Number(row.cost_price ?? 0),
+    profitPerUnit: pricing.salePrice - Number(row.cost_price ?? 0),
     createdAt: row.created_at,
     created_at: row.created_at,
   };
@@ -110,6 +152,17 @@ export function mapOrder(row, items = []) {
 }
 
 function mapOrderItem(item) {
+  const unitPrice = Number(item.unit_price);
+  const originalPrice = Number(item.original_unit_price ?? unitPrice);
+  const discountPercent = Number(item.discount_percent ?? 0);
+  const unitCost = Number(
+    item.unit_cost ?? item.products?.cost_price ?? 0,
+  );
+  const quantity = item.quantity;
+  const lineTotal = Number(item.line_total ?? unitPrice * quantity);
+  const lineProfit = (unitPrice - unitCost) * quantity;
+  const lineSavings = (originalPrice - unitPrice) * quantity;
+
   return {
     _id: item.id,
     product: item.product_id,
@@ -117,11 +170,28 @@ function mapOrderItem(item) {
     productName: item.product_name,
     product_name: item.product_name,
     productImage: item.product_image,
-    quantity: item.quantity,
-    price: Number(item.unit_price),
-    unit_price: Number(item.unit_price),
-    line_total: Number(item.line_total),
+    quantity,
+    price: unitPrice,
+    unit_price: unitPrice,
+    originalPrice,
+    original_unit_price: originalPrice,
+    discountPercent,
+    discount_percent: discountPercent,
+    unitCost,
+    unit_cost: unitCost,
+    line_total: lineTotal,
+    lineProfit,
+    line_profit: lineProfit,
+    lineSavings,
   };
+}
+
+export function calcOrderProfit(items = []) {
+  return items.reduce((sum, item) => sum + (item.lineProfit ?? item.line_profit ?? 0), 0);
+}
+
+export function calcOrderSavings(items = []) {
+  return items.reduce((sum, item) => sum + (item.lineSavings ?? 0), 0);
 }
 
 export function getStockBadge(stock, stockLevel) {

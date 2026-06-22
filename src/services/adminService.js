@@ -95,6 +95,7 @@ export async function fetchSalesAnalytics({
 
     return {
       totalRevenue: summary.totalRevenue,
+      totalProfit: summary.totalProfit,
       totalOrders: summary.totalOrders,
       totalItems: summary.totalItems,
       chartData,
@@ -127,8 +128,9 @@ async function fetchSalesAnalyticsFromOrders({
         product_name,
         quantity,
         unit_price,
+        unit_cost,
         line_total,
-        products(category, subcategory)
+        products(category, subcategory, cost_price)
       )
     `)
     .gte("created_at", periodStart)
@@ -152,6 +154,7 @@ async function fetchSalesAnalyticsFromOrders({
   }
 
   let totalRevenue = 0;
+  let totalProfit = 0;
   let totalOrders = filteredOrders.length;
   let totalItems = 0;
   const categoryBreakdown = {};
@@ -164,11 +167,14 @@ async function fetchSalesAnalyticsFromOrders({
       const cat = item.products?.category || "Other";
       const sub = item.products?.subcategory || "General";
       const lineTotal = Number(item.line_total || item.unit_price * item.quantity);
+      const unitCost = Number(item.unit_cost ?? item.products?.cost_price ?? 0);
+      const lineProfit = (Number(item.unit_price) - unitCost) * item.quantity;
 
       if (category && cat !== category) return;
       if (subcategory && sub !== subcategory) return;
 
       orderRevenue += lineTotal;
+      totalProfit += lineProfit;
       totalItems += item.quantity;
 
       const key = `${cat} / ${sub}`;
@@ -195,6 +201,7 @@ async function fetchSalesAnalyticsFromOrders({
 
   return {
     totalRevenue,
+    totalProfit,
     totalOrders,
     totalItems,
     chartData,
@@ -217,6 +224,14 @@ export async function updateOrderStatus(orderId, status) {
 
 /** Map sales table row → admin UI shape */
 function mapSalesRow(row) {
+  const unitPrice = Number(row.unit_price);
+  const unitCost = Number(row.unit_cost ?? 0);
+  const quantity = row.quantity;
+  const lineTotal = Number(row.line_total);
+  const lineProfit = Number(
+    row.line_profit ?? (unitPrice - unitCost) * quantity,
+  );
+
   return {
     id: row.id,
     orderId: row.order_id,
@@ -228,19 +243,23 @@ function mapSalesRow(row) {
     productName: row.product_name,
     category: row.category || "Other",
     subcategory: row.subcategory || "General",
-    quantity: row.quantity,
-    unitPrice: Number(row.unit_price),
-    lineTotal: Number(row.line_total),
+    quantity,
+    unitPrice,
+    unitCost,
+    lineTotal,
+    lineProfit,
   };
 }
 
 function buildSalesSummary(rows) {
   const totalRevenue = rows.reduce((sum, r) => sum + r.lineTotal, 0);
+  const totalProfit = rows.reduce((sum, r) => sum + r.lineProfit, 0);
   const totalItems = rows.reduce((sum, r) => sum + r.quantity, 0);
   const uniqueOrders = new Set(rows.map((r) => r.orderId)).size;
 
   return {
     totalRevenue,
+    totalProfit,
     totalItems,
     totalOrders: uniqueOrders,
     avgOrderValue: uniqueOrders ? totalRevenue / uniqueOrders : 0,
@@ -287,7 +306,8 @@ async function fetchSalesFromOrders({ period, category, subcategory }) {
         quantity,
         unit_price,
         line_total,
-        products(category, subcategory)
+        unit_cost,
+        products(category, subcategory, cost_price)
       )
     `)
     .gte("created_at", periodStart)
@@ -319,7 +339,12 @@ async function fetchSalesFromOrders({ period, category, subcategory }) {
         subcategory: sub,
         quantity: item.quantity,
         unitPrice: Number(item.unit_price),
+        unitCost: Number(item.unit_cost ?? item.products?.cost_price ?? 0),
         lineTotal: Number(item.line_total || item.unit_price * item.quantity),
+        lineProfit:
+          (Number(item.unit_price) -
+            Number(item.unit_cost ?? item.products?.cost_price ?? 0)) *
+          item.quantity,
       });
     });
   });
